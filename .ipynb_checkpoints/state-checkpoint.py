@@ -12,13 +12,11 @@ TERMINAL_ID = 3
 DECK_SIZE = 52
 
 # cards are 0->51
-CHECK = 0
-FOLD = 1
-CALL = 2
-BET = 3
-RAISE = 4
-
-PLAYER_ACTIONS = [CHECK, FOLD, CALL, BET, RAISE]
+BET = 52
+CALL = 53
+FOLD = 54
+CHECK = 55
+PLAYER_ACTIONS = [BET, CALL, FOLD, CHECK]
 
 PREFLOP = 0
 FLOP = 1
@@ -45,13 +43,8 @@ def build_range(combos):
 
     return r
 
-p1_range = build_range(Range('88+ AJo+ ATs+ KQ KJ JTs T9s').combos)
-p2_range = build_range(Range('88+ AJo+ ATs+ KQ KJ JTs T9s').combos)
-# p2_range = build_range(Range('QQ+ KQ+ AQ+').combos)
-# p1_range = build_range(
-#         Range('22+ A2+ K2+ Q2+ J2+ T2+ 92+ 82+ 72+ 62+ 52+ 42+ 32+').combos)
-# p2_range = build_range(
-#         Range('22+ A2+ K2+ Q2+ J2+ T2+ 92+ 82+ 72+ 62+ 52+ 42+ 32+').combos)
+p1_range = build_range(Range('22+ A2+').combos)
+p2_range = build_range(Range('22+ A2+').combos)
 
 class PlayerState:
     def __init__(self):
@@ -79,18 +72,24 @@ class State:
         # current player index (0 oop, 1 ip)
         # 2 chance node, 3 terminal node
         self._current = CHANCE_ID
+
         # TODO better intialization
         self._players = [PlayerState(), PlayerState()]
+
         # current number of chips in pot
         self._pot = 100
-        # current streets
+
         self._street = RIVER
+
         # action sequence
         self._history = ""
+
         # create empty deck
         self._deck = Deck()
+
         # legal actions start as cards to draw
         self._legal_actions = list(range(DECK_SIZE))
+
         # array of ints for now
         self._board = []
 
@@ -109,7 +108,7 @@ class State:
 
     # TEMPORARY
     def set_board(self, board):
-        self._board = sorted(board)
+        self._board = board
         for c in board:
             self._deck.cards.remove(c)
         self._update_node_type()
@@ -156,11 +155,6 @@ class State:
         if action == BET:
             # can bet if other player has not
             if self.other_player._wager == 0: return True
-            return False
-        if action == RAISE:
-            # if stack is not zero and other player has bet
-            if self.other_player._wager > 0 and self.current_player._stack > 0:
-                return True
             return False
         if action == CHECK:
             # can check if other player has not bet
@@ -266,101 +260,83 @@ class State:
         @param action: BET, CHECK, CALL, ...
         @param action: if chance node, then index of chance outcome
         """
-        new_state = deepcopy(self)
         action = int(action)
-        if new_state.is_terminal: return new_state
-        if new_state.is_chance:
+        if self.is_terminal: return
+        if self.is_chance:
             # apply chance action
             # action is index of combo in player range
-            for (i, p) in enumerate(new_state._players):
+            for (i, p) in enumerate(self._players):
                 if p._hand == None:
                     # update history
-                    new_state._history += 'd'
+                    self._history += 'd'
                     # add card to hand
                     p._hand = action
                     # remove card
                     if i == 0:
                         c1 = p1_range[action][0]
                         c2 = p1_range[action][1]
-                        new_state._deck.cards.remove(c1)
-                        new_state._deck.cards.remove(c2)
+                        self._deck.cards.remove(c1)
+                        self._deck.cards.remove(c2)
                     else:
                         c1 = p2_range[action][0]
                         c2 = p2_range[action][1]
-                        new_state._deck.cards.remove(c1)
-                        new_state._deck.cards.remove(c2)
+                        self._deck.cards.remove(c1)
+                        self._deck.cards.remove(c2)
                     # calculate node type
-                    new_state._current = PLAYER_1_ID
-                    new_state._update_node_type()
-                    return new_state
-
+                    self._current = PLAYER_1_ID
+                    self._update_node_type()
+                    return
         # apply player action
         if action == CHECK:
-            new_state._history += 'x'
-            if new_state.current == PLAYER_1_ID:
-                new_state._current = PLAYER_2_ID
+            self._history += 'x'
+            if self.current == PLAYER_1_ID:
+                self._current = PLAYER_2_ID
             else:
                 # transition to next street
-                new_state._next_street()
+                self._next_street()
 
         if action == BET:
-            new_state._history += 'b'
+            self._history += 'b'
             # if has enough chips to bet pot without going all in
-            if new_state.current_player._stack >= new_state._pot:
-                new_state.current_player._wager += new_state._pot
+            if self.current_player._stack >= self._pot:
+                self.current_player._wager += self._pot
             else:
-                new_state.current_player._wager += new_state.current_player._stack
+                self.current_player._wager += self.current_player._stack
 
-            new_state.current_player._stack -= new_state.current_player._wager
-            new_state._pot += new_state.current_player._wager
+            self.current_player._stack -= self.current_player._wager
+            self._pot += self.current_player._wager
             # current player id is now other player
-            new_state._current = 1 - new_state.current
-
-        if action == RAISE:
-            new_state._history += 'r'
-            # if has enough chips to 2x other player wager without going allin
-            raise_amt = 0
-            if new_state.current_player._stack >= new_state.other_player._wager:
-                raise_amt = 2 * new_state.other_player._wager
-            else:
-                raise_amt = new_state.current_player._stack
-            new_state.current_player._wager = raise_amt
-            new_state.current_player._stack -= raise_amt
-            new_state._pot += raise_amt
-            new_state._current = 1 - new_state.current
+            self._current = 1 - self.current
 
         if action == CALL:
-            new_state._history += 'c'
-            other_wager = new_state.other_player._wager
-            if new_state.current_player._stack < other_wager:
+            self._history += 'c'
+            other_wager = self.other_player._wager
+            if self.current_player._stack < other_wager:
                 # calculate difference, give other player chips back
-                diff = other_wager - new_state.current_player._stack
-                new_state.other_player._stack += diff
+                diff = other_wager - self.current_player._stack
+                self.other_player._stack += diff
                 # pot should now be 2x current player stack
-                new_state._pot = 2 * new_state.current_player.stack
-                new_state.current_player._stack = 0
+                self._pot = 2 * self.current_player.stack
+                self.current_player._stack = 0
             else:
-                new_state._pot += other_wager
-                new_state.current_player._stack -= other_wager
+                self._pot += other_wager
+                self.current_player._stack -= other_wager
 
             # remove other wager
-            new_state.other_player._wager = 0
+            self.other_player._wager = 0
             # transition to next street
-            new_state._next_street()
+            self._next_street()
 
         if action == FOLD:
-            new_state._history += 'f'
+            self._history += 'f'
             # calculate diffence between bets
-            diff = new_state.other_player._wager - new_state.current_player._wager
-            # remove difference from pot
-            new_state._pot -= diff
-            # return difference to other player stack
-            new_state.other_player._stack += diff
+            diff = self.other_player._wager - self.current_player._wager
+            self._pot -= diff
+            self.other_player._stack += diff
             # transition to next street
-            new_state._next_street()
+            self._next_street()
 
-        new_state._update_node_type()
-        return new_state
+        self._update_node_type()
 
     # return a tuple of utility
     def get_utility(self) -> (float, float):
@@ -383,6 +359,10 @@ class State:
         if p1_score == p2_score: return (0, 0)
         # lower score is better
         elif p1_score < p2_score:
+            # h1 = [Card.int_to_str(c) for c in p1_hand]
+            # h2 = [Card.int_to_str(c) for c in p2_hand]
+            # b = [Card.int_to_str(c) for c in self._board]
+            # print(h1, h2, b)
             return (value, -value)
         else:
             return (-value, value)

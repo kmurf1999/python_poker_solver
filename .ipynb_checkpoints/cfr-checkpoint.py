@@ -50,7 +50,7 @@ class CFRTrainer:
         for t in range(1, T):
             for player in [0, 1]:
                 utils[player] = self.cfr(self._initial_state, player, 1)
-            print(sum(utils))
+            print(utils)
 
     def get_or_create(self, key, n_actions):
         """Get or create infoset node"""
@@ -108,20 +108,20 @@ class CFRTrainer:
 
         return util
 
-board = [Card('4c'), Card('6s'), Card('Ts'), Card('3d'), Card('5s')]
-
-init_state = State()
-init_state.set_board(board)
-
-p1_range = Range('JJ+ AJ+ KJ+ QJ+')
-p2_range = Range('JJ+ AJ+ KJ+ QJ+')
-
-trainer = CFRTrainer(init_state)
-trainer.train(10)
-
-for k in trainer._infosets:
-    player, card, hist = k.split(' ')
-    if player == '0':
-        print(hist, p1_range.combos[int(card)], get_final_strategy(trainer._infosets[k]))
-
+# board = [Card('4c'), Card('6s'), Card('Ts'), Card('3d'), Card('5s')]
+# 
+# init_state = State()
+# init_state.set_board(board)
+# 
+# p1_range = Range('JJ+ AJ+ KJ+ QJ+')
+# p2_range = Range('JJ+ AJ+ KJ+ QJ+')
+# 
+# trainer = CFRTrainer(init_state)
+# trainer.train(10)
+# 
+# for k in trainer._infosets:
+#     player, card, hist = k.split(' ')
+#     if player == '0':
+#         print(hist, p1_range.combos[int(card)], get_final_strategy(trainer._infosets[k]))
+# 
         # print(v, infosets[v].strategy_sum)
