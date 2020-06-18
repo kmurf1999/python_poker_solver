@@ -356,6 +356,8 @@ class State:
             new_state._pot -= diff
             # return difference to other player stack
             new_state.other_player._stack += diff
+            # set player folded
+            new_state.current_player._has_folded = True
             # transition to next street
             new_state._next_street()
 
@@ -366,13 +368,16 @@ class State:
     def get_utility(self) -> (float, float):
         global p1_range, p2_range, evaluator
         # needs to be terminal
-        if not self.is_terminal: return (0, 0)
+        if not self.is_terminal:
+            return (0, 0)
+
         value = self._pot / 2.0
         # check for folds
         if self._players[0].has_folded:
             return (-value, value)
         if self._players[1].has_folded:
             return (value, -value)
+
         # evaluate showdown
         p1_hand = list(p1_range[self._players[0]._hand])
         p2_hand = list(p2_range[self._players[1]._hand])
